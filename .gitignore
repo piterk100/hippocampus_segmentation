@@ -1,0 +1,33 @@
+# --- Python i środowiska ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+.ipynb_checkpoints/
+
+# --- dane MRI / wejściowe ---
+NII/
+dataset/
+train_set/
+val_set/
+*.nii
+*.nii.gz
+
+# --- wyniki, checkpointy, logi ---
+checkpoints/
+runs/
+logs/
+*.pth
+*.pt
+*.ckpt
+
+# --- systemowe ---
+.DS_Store
+Thumbs.db
+
+# --- pliki konfiguracyjne lokalne ---
+.env
+config_local.yaml
