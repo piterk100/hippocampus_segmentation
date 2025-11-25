@@ -4,6 +4,10 @@ import numpy as np
 from torch.utils.data import Dataset
 import nibabel as nib
 
+import scipy.ndimage as ndi
+import numpy as np
+import torch
+
 def get_sub_volume(image, label,
                    orig_x = 512, orig_y = 512, orig_z = 140,
                    output_x = 128, output_y = 128, output_z = 16,
@@ -84,6 +88,41 @@ def standardize(image):
     s = image.std() + 1e-8
     return (image - m) / s
 
+def random_augment_3d(img, msk, max_shift=10, max_angle=10):
+    """
+    Prosta augmentacja 2D dokonywana slice-po-slice na stacku 3D.
+
+    img, msk: numpy array (H, W, D)
+    Zwraca img_aug, msk_aug o tym samym kształcie.
+    """
+    # z prawdopodobieństwem 0.5 w ogóle NIE robimy augmentacji
+    if np.random.rand() < 0.5:
+        return img, msk
+
+    H, W, D = img.shape
+    img_aug = np.empty_like(img)
+    msk_aug = np.empty_like(msk)
+
+    angle = np.random.uniform(-max_angle, max_angle)
+    shift_x = np.random.uniform(-max_shift, max_shift)
+    shift_y = np.random.uniform(-max_shift, max_shift)
+
+    for z in range(D):
+        sl_img = img[:, :, z]
+        sl_msk = msk[:, :, z]
+
+        # obrót
+        sl_img = ndi.rotate(sl_img, angle, reshape=False, order=1, mode="nearest")
+        sl_msk = ndi.rotate(sl_msk, angle, reshape=False, order=0, mode="nearest")
+
+        # przesunięcie
+        sl_img = ndi.shift(sl_img, shift=(shift_x, shift_y), order=1, mode="nearest")
+        sl_msk = ndi.shift(sl_msk, shift=(shift_x, shift_y), order=0, mode="nearest")
+
+        img_aug[:, :, z] = sl_img
+        msk_aug[:, :, z] = sl_msk
+
+    return img_aug, msk_aug
 
 class DatasetFromNii(Dataset):
   def __init__(self, image_dir, patches_per_patient=16, mode="train"):
@@ -148,14 +187,26 @@ class DatasetFromNii(Dataset):
 
             self.x.append(torch.tensor(p_img, dtype=torch.float32))
             self.y.append(torch.tensor(p_msk, dtype=torch.float32))
-
+  
   def __getitem__(self, index):
     if torch.is_tensor(index):
-            index = index.tolist()
+        index = index.tolist()
 
-    proccessed_out = {'image': self.x[index], 'mask': self.y[index]}
+    img = self.x[index]   # tensor (H, W, D)
+    msk = self.y[index]   # tensor (H, W, D)
 
-    return proccessed_out
+    if self.mode == "train":
+        img_np = img.numpy()
+        msk_np = msk.numpy()
+
+        img_np, msk_np = random_augment_3d(img_np, msk_np,
+                                           max_shift=10,
+                                           max_angle=10)
+
+        img = torch.tensor(img_np, dtype=torch.float32)
+        msk = torch.tensor(msk_np, dtype=torch.float32)
+
+    return {'image': img, 'mask': msk}
 
   def __len__(self):
     return len(self.x)

@@ -32,7 +32,7 @@ torch.manual_seed(42); np.random.seed(42); random.seed(42)
 if device.type == "cuda":
     torch.cuda.manual_seed_all(42)
 
-writer = SummaryWriter("runs/unet2d_run3")
+writer = SummaryWriter("runs/unet2d_run4")
 
 os.makedirs("debug_slices", exist_ok=True)
 
@@ -142,25 +142,30 @@ for epoch in range(30):
 
             prob = torch.sigmoid(target)
 
-            # --- ZAPIS PRZYKŁADOWEGO SLAJSA DO PNG CO KILKA EPOK ---
-            if epoch % 5 == 0 and val_batch_idx == 0:  # np. co 5 epok, pierwszy batch z walidacji
-                img_np  = imgs2d[0, 0].detach().cpu().numpy()
-                prob_np = prob[0, 0].detach().cpu().numpy()
-                gt_np   = gts2d[0, 0].detach().cpu().numpy()
+            if epoch % 5 == 0 and val_batch_idx == 0:
+                slice_idx = D // 2   # środkowy slice w osi Z
 
-                fig, axes = plt.subplots(1, 2, figsize=(6, 3))
-                axes[0].imshow(prob_np, cmap="gray")
-                axes[0].set_title("pred prob")
+                # slice_idx odnosi się do osi Z, więc bierzemy imgs2d[slice_idx]
+                img_np  = imgs2d[slice_idx, 0].detach().cpu().numpy()
+                prob_np = prob[slice_idx, 0].detach().cpu().numpy()
+                gt_np   = gts2d[slice_idx, 0].detach().cpu().numpy()
+
+                fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+                axes[0].imshow(img_np, cmap="gray")
+                axes[0].set_title("input")
                 axes[0].axis("off")
 
                 axes[1].imshow(gt_np, cmap="gray")
-                axes[1].set_title("gt mask")
+                axes[1].set_title("gt")
                 axes[1].axis("off")
 
+                axes[2].imshow(prob_np, cmap="gray")
+                axes[2].set_title(f"pred (ep {epoch})")
+                axes[2].axis("off")
+
                 fig.tight_layout()
-                fig.savefig(f"debug_slices/epoch{epoch:03d}_val0.png", dpi=150)
+                fig.savefig(f"debug_slices/epoch{epoch:03d}_slice{slice_idx:03d}.png", dpi=150)
                 plt.close(fig)
-            # --- KONIEC BLOKU ZAPISU OBRAZKA ---
 
             mean_prob += prob.mean().item()
             mean_prob_cnt += 1
@@ -254,33 +259,3 @@ writer.close()
 if best_thr_last is not None:
     with open("best_thr.txt", "w") as f:
         f.write(f"{best_thr_last:.3f}\n")
-
-"""# ===== PROSTA INFERENCJA NA JEDNYM BATCHU Z WALIDACJI =====
-model.eval()
-with torch.inference_mode():
-    data = next(iter(val_dataloader))  # pierwszy batch z walidacji
-    image, ground_truth = data['image'], data['mask']
-
-    # (B,H,W,D) -> (B,1,H,W,D)
-    image = image.unsqueeze(1).float().to(device)
-    ground_truth = ground_truth.unsqueeze(1).float().to(device)
-
-    B, C, H, W, D = image.shape
-    idx    = torch.arange(D, device=device)
-    x5d    = image.permute(0,4,1,2,3)[:, idx]          # (B,D,1,H,W)
-    imgs2d = x5d.reshape(-1, C, H, W)                  # (N,1,H,W)
-    y5d    = ground_truth.permute(0,4,1,2,3)[:, idx]
-    gts2d  = y5d.reshape(-1, C, H, W)
-
-    logits = model(imgs2d)
-    prob   = torch.sigmoid(logits)
-
-    # weź środkowy slajs z batcha
-    mid = prob.shape[0] // 2
-    prob_slice = prob[mid, 0].detach().cpu().numpy()
-    gt_slice   = gts2d[mid, 0].detach().cpu().numpy()
-
-    fig, ax = plt.subplots(1, 2, figsize=(6,3))
-    ax[0].imshow(prob_slice, cmap="gray"); ax[0].set_title("pred prob")
-    ax[1].imshow(gt_slice,   cmap="gray"); ax[1].set_title("gt mask")
-    plt.show()"""
