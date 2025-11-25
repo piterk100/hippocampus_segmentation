@@ -3,7 +3,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-patients = glob.glob("C:/Users/Piotr/Documents/DL/NII/*")
+patients = glob.glob("NII/*")
 path = patients[0]
 
 single_img = nib.load(path + "/segmentations/Hippocampus_L.nii.gz").get_fdata()

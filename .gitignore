@@ -31,3 +31,7 @@ Thumbs.db
 # --- pliki konfiguracyjne lokalne ---
 .env
 config_local.yaml
+
+# --- pliki wynikowe ---
+debug_slices/
+best_thr.txt
