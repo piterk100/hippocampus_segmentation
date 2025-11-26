@@ -14,7 +14,7 @@ import os
 
 from dataloader import DatasetFromNii
 from unet import MyUNet2D
-from metrics import soft_dice, soft_dice_global
+from metrics import soft_dice
 
 torch.set_num_threads(4)
 
@@ -32,7 +32,7 @@ torch.manual_seed(42); np.random.seed(42); random.seed(42)
 if device.type == "cuda":
     torch.cuda.manual_seed_all(42)
 
-writer = SummaryWriter("runs/unet2d_run8")
+writer = SummaryWriter("runs/unet2d_run9")
 
 os.makedirs("debug_slices", exist_ok=True)
 

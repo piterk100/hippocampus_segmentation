@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class MyUNet2D(nn.Module):
-    def __init__(self, in_channels, num_classes, level_channels=[16, 32, 64]) -> None:
+    def __init__(self, in_channels, num_classes, level_channels=[32, 64, 128]) -> None:
         super(MyUNet2D, self).__init__()
 
         #level 1
