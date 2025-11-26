@@ -5,8 +5,8 @@ from torch.utils.data import Dataset
 import nibabel as nib
 
 import scipy.ndimage as ndi
-import numpy as np
-import torch
+import cv2
+
 
 def get_sub_volume(image, label,
                    orig_x = 512, orig_y = 512, orig_z = 140,
@@ -81,14 +81,50 @@ def get_sub_volume(image, label,
 
 def standardize(image):
     # łagodny clip outlierów
-    p2, p98 = np.percentile(image, [2, 98])
-    image = np.clip(image, p2, p98)
+    p1, p99 = np.percentile(image, [1, 99])
+    image = np.clip(image, p1, p99)
     # z-score per-volume
     m = image.mean()
     s = image.std() + 1e-8
     return (image - m) / s
 
-def random_augment_3d(img, msk, max_shift=10, max_angle=10):
+def center_pad_crop(arr, target_h, target_w):
+    """
+    Przycina lub dopaduję 2D array do (target_h, target_w), centralnie.
+    """
+    h, w = arr.shape
+
+    # CROP jeśli za duże
+    if h > target_h:
+        start_h = (h - target_h) // 2
+        arr = arr[start_h:start_h + target_h, :]
+        h = target_h
+
+    if w > target_w:
+        start_w = (w - target_w) // 2
+        arr = arr[:, start_w:start_w + target_w]
+        w = target_w
+
+    # PAD jeśli za małe
+    if h < target_h or w < target_w:
+        pad_h = target_h - h
+        pad_w = target_w - w
+
+        pad_top    = pad_h // 2
+        pad_bottom = pad_h - pad_top
+        pad_left   = pad_w // 2
+        pad_right  = pad_w - pad_left
+
+        arr = np.pad(
+            arr,
+            ((pad_top, pad_bottom), (pad_left, pad_right)),
+            mode="constant",
+            constant_values=0
+        )
+
+    return arr
+
+def random_augment_3d(img, msk, max_shift=8, max_angle=8, max_scale_jitter=0.05):
     """
     Prosta augmentacja 2D dokonywana slice-po-slice na stacku 3D.
 
@@ -103,9 +139,12 @@ def random_augment_3d(img, msk, max_shift=10, max_angle=10):
     img_aug = np.empty_like(img)
     msk_aug = np.empty_like(msk)
 
-    angle = np.random.uniform(-max_angle, max_angle)
+    angle   = np.random.uniform(-max_angle, max_angle)
     shift_x = np.random.uniform(-max_shift, max_shift)
     shift_y = np.random.uniform(-max_shift, max_shift)
+
+    # SCALING – jeden scale dla całego wolumenu
+    scale = 1.0 + np.random.uniform(-max_scale_jitter, max_scale_jitter)
 
     for z in range(D):
         sl_img = img[:, :, z]
@@ -119,8 +158,26 @@ def random_augment_3d(img, msk, max_shift=10, max_angle=10):
         sl_img = ndi.shift(sl_img, shift=(shift_x, shift_y), order=1, mode="nearest")
         sl_msk = ndi.shift(sl_msk, shift=(shift_x, shift_y), order=0, mode="nearest")
 
-        img_aug[:, :, z] = sl_img
-        msk_aug[:, :, z] = sl_msk
+        # --- SCALING (NOWE) ---
+        new_h = max(1, int(round(H * scale)))
+        new_w = max(1, int(round(W * scale)))
+
+        sl_img_scaled = cv2.resize(
+            sl_img,
+            (new_w, new_h),
+            interpolation=cv2.INTER_LINEAR
+        )
+        sl_msk_scaled = cv2.resize(
+            sl_msk,
+            (new_w, new_h),
+            interpolation=cv2.INTER_NEAREST
+        )
+
+        sl_img_final = center_pad_crop(sl_img_scaled, H, W)
+        sl_msk_final = center_pad_crop(sl_msk_scaled, H, W)
+
+        img_aug[:, :, z] = sl_img_final
+        msk_aug[:, :, z] = sl_msk_final
 
     return img_aug, msk_aug
 

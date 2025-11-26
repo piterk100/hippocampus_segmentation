@@ -32,7 +32,7 @@ torch.manual_seed(42); np.random.seed(42); random.seed(42)
 if device.type == "cuda":
     torch.cuda.manual_seed_all(42)
 
-writer = SummaryWriter("runs/unet2d_run4")
+writer = SummaryWriter("runs/unet2d_run8")
 
 os.makedirs("debug_slices", exist_ok=True)
 
