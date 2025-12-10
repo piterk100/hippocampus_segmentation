@@ -6,7 +6,6 @@ from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 import math
 import random
-#import matplotlib.pyplot as plt
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -32,7 +31,7 @@ torch.manual_seed(42); np.random.seed(42); random.seed(42)
 if device.type == "cuda":
     torch.cuda.manual_seed_all(42)
 
-writer = SummaryWriter("runs/unet2d_run9")
+writer = SummaryWriter("runs/unet2d_run12")
 
 os.makedirs("debug_slices", exist_ok=True)
 
@@ -54,8 +53,9 @@ def estimate_pos_weight(ds, n=64):
     return float(min(max(pw, 5.0), 50.0))
 
 pw = estimate_pos_weight(train_data)
+print("Estimated pos_weight:", pw)
 
-bce = BCEWithLogitsLoss(reduction="mean", pos_weight=torch.tensor([pw], device=device))
+bce = BCEWithLogitsLoss(reduction="mean", pos_weight=torch.tensor([5.0], device=device))
 dice = DiceLoss(sigmoid=True, smooth_nr=1e-6, smooth_dr=1e-6)
 
 def combined_loss(pred, target):
